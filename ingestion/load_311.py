@@ -89,14 +89,20 @@ def fetch_page(offset: int, watermark: str | None) -> list[dict]:
 
 def load_rows(client: bigquery.Client, rows: list[dict]) -> None:
     """Append rows to the raw table with an explicit all-STRING schema."""
-    # Collect every field name seen across this batch of rows.
+    # Socrata returns a few nested objects (e.g. `location`, a geo point that
+    # duplicates the flat latitude/longitude fields). Drop them: we keep the
+    # flat lat/long columns and avoid nested-type headaches at the raw layer.
+    NESTED_FIELDS = {"location"}
+
+    cleaned = []
     field_names = set()
     for row in rows:
+        row = {k: v for k, v in row.items() if k not in NESTED_FIELDS}
+        cleaned.append(row)
         field_names.update(row.keys())
 
-    # Force every column to STRING. Socrata returns values as strings anyway,
-    # and this keeps the schema stable across batches (no per-batch autodetect
-    # guessing INTEGER on one batch and STRING on another). All real type
+    # Force every remaining column to STRING. Socrata returns values as strings
+    # anyway, and this keeps the schema stable across batches. All real type
     # casting happens downstream in the dbt staging model.
     schema = [bigquery.SchemaField(name, "STRING") for name in sorted(field_names)]
 
@@ -105,7 +111,7 @@ def load_rows(client: bigquery.Client, rows: list[dict]) -> None:
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         schema=schema,
     )
-    job = client.load_table_from_json(rows, FULL_TABLE, job_config=job_config)
+    job = client.load_table_from_json(cleaned, FULL_TABLE, job_config=job_config)
     job.result()
 
 
