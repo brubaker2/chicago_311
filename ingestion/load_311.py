@@ -88,11 +88,22 @@ def fetch_page(offset: int, watermark: str | None) -> list[dict]:
 
 
 def load_rows(client: bigquery.Client, rows: list[dict]) -> None:
-    """Append rows to the raw table, autodetecting schema on first load."""
+    """Append rows to the raw table with an explicit all-STRING schema."""
+    # Collect every field name seen across this batch of rows.
+    field_names = set()
+    for row in rows:
+        field_names.update(row.keys())
+
+    # Force every column to STRING. Socrata returns values as strings anyway,
+    # and this keeps the schema stable across batches (no per-batch autodetect
+    # guessing INTEGER on one batch and STRING on another). All real type
+    # casting happens downstream in the dbt staging model.
+    schema = [bigquery.SchemaField(name, "STRING") for name in sorted(field_names)]
+
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        autodetect=True,
+        schema=schema,
     )
     job = client.load_table_from_json(rows, FULL_TABLE, job_config=job_config)
     job.result()
