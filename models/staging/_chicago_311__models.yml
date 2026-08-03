@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: stg_chicago_311__service_requests
+    description: >
+      Cleaned and renamed 311 service requests: one row per request,
+      typed timestamps, boolean flags, and a trimmed column set ready
+      for intermediate and mart models to build on.
+    columns:
+      - name: sr_number
+        description: Unique service request identifier (natural key).
+        data_tests:
+          - unique
+          - not_null
+      - name: status
+        description: Current lifecycle status (Open, Completed, and Dup variants).
+        data_tests:
+          - not_null
+      - name: created_at
+        description: Timestamp the request was created.
+        data_tests:
+          - not_null

@@ -1,6 +1,19 @@
-# you shouldn't commit these into source control
-# these are the default directory names, adjust/add to fit your needs
+# dbt
 target/
 dbt_packages/
 logs/
+.user.yml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+
+# credentials — never commit keys
+*.json
+!models/**/*.json
+service-account*.json
 dbt_internal_packages/
