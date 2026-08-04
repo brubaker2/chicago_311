@@ -38,6 +38,7 @@ import time
 import requests
 from datetime import datetime, timezone
 from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 
 # --- config -----------------------------------------------------------------
 
@@ -62,10 +63,12 @@ def get_watermark(client: bigquery.Client) -> str | None:
         row = next(iter(client.query(query).result()))
         if row.wm is None:
             return None
-        # Socrata expects a floating timestamp, no timezone suffix.
-        return row.wm.strftime("%Y-%m-%dT%H:%M:%S")
-    except Exception:
-        # Table doesn't exist yet -> first run -> full pull.
+        # last_modified_date is stored as STRING (ISO-8601). Socrata expects a
+        # floating timestamp with no timezone suffix, which is already this
+        # format, so trim to seconds precision and return as-is.
+        return str(row.wm)[:19]
+    except NotFound:
+        # Table genuinely doesn't exist yet -> first run -> full pull.
         return None
 
 
