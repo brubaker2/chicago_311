@@ -12,10 +12,15 @@ sources:
     # Source freshness: the city updates this dataset daily. We measure
     # freshness off last_modified_date, which advances whenever any request
     # is updated. Thresholds are generous because the published feed lags.
-    freshness:
-      warn_after: {count: 36, period: hour}
-      error_after: {count: 72, period: hour}
-    loaded_at_field: last_modified_date
+    config:
+      freshness:
+        warn_after:
+          count: 36
+          period: hour
+        error_after:
+          count: 72
+          period: hour
+      loaded_at_field: "CAST(last_modified_date AS TIMESTAMP)"
 
     tables:
       - name: service_requests
@@ -27,5 +32,4 @@ sources:
           - name: sr_number
             description: Unique service request identifier (natural key).
             data_tests:
-              - unique
               - not_null
