@@ -38,6 +38,7 @@ import time
 import requests
 from datetime import datetime, timezone
 from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 
 # --- config -----------------------------------------------------------------
 
@@ -62,10 +63,12 @@ def get_watermark(client: bigquery.Client) -> str | None:
         row = next(iter(client.query(query).result()))
         if row.wm is None:
             return None
-        # Socrata expects a floating timestamp, no timezone suffix.
-        return row.wm.strftime("%Y-%m-%dT%H:%M:%S")
-    except Exception:
-        # Table doesn't exist yet -> first run -> full pull.
+        # last_modified_date is stored as STRING (ISO-8601). Socrata expects a
+        # floating timestamp with no timezone suffix, which is already this
+        # format, so trim to seconds precision and return as-is.
+        return str(row.wm)[:19]
+    except NotFound:
+        # Table genuinely doesn't exist yet -> first run -> full pull.
         return None
 
 
@@ -88,13 +91,30 @@ def fetch_page(offset: int, watermark: str | None) -> list[dict]:
 
 
 def load_rows(client: bigquery.Client, rows: list[dict]) -> None:
-    """Append rows to the raw table, autodetecting schema on first load."""
+    """Append rows to the raw table with an explicit all-STRING schema."""
+    # Socrata returns a few nested objects (e.g. `location`, a geo point that
+    # duplicates the flat latitude/longitude fields). Drop them: we keep the
+    # flat lat/long columns and avoid nested-type headaches at the raw layer.
+    NESTED_FIELDS = {"location"}
+
+    cleaned = []
+    field_names = set()
+    for row in rows:
+        row = {k: v for k, v in row.items() if k not in NESTED_FIELDS}
+        cleaned.append(row)
+        field_names.update(row.keys())
+
+    # Force every remaining column to STRING. Socrata returns values as strings
+    # anyway, and this keeps the schema stable across batches. All real type
+    # casting happens downstream in the dbt staging model.
+    schema = [bigquery.SchemaField(name, "STRING") for name in sorted(field_names)]
+
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        autodetect=True,
+        schema=schema,
     )
-    job = client.load_table_from_json(rows, FULL_TABLE, job_config=job_config)
+    job = client.load_table_from_json(cleaned, FULL_TABLE, job_config=job_config)
     job.result()
 
 
