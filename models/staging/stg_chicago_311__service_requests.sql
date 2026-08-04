@@ -40,3 +40,7 @@ renamed as (
 )
 
 select * from renamed
+qualify row_number() over (
+    partition by sr_number
+    order by last_modified_at desc
+) = 1
