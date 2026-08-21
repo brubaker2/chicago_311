@@ -1,20 +1,19 @@
 with source as (
-
     select * from {{ source('chicago_311', 'service_requests') }}
-
 ),
 
 renamed as (
-
     select
         -- ids
         sr_number,
         parent_sr_number,
+        legacy_sr_number,
 
         -- request classification
         sr_type,
         sr_short_code,
         owner_department,
+        created_department,
         origin,
         status,
 
@@ -27,16 +26,32 @@ renamed as (
         cast(last_modified_date as timestamp)  as last_modified_at,
         cast(closed_date as timestamp)         as closed_at,
 
-        -- location
+        -- location: address
         street_address,
         zip_code,
+        city,
+        state,
+
+        -- location: administrative geography
         community_area,
         ward,
+        precinct,
+
+        -- location: police geography
+        police_district,
+        police_sector,
+        police_beat,
+
+        -- location: utility geography
+        electrical_district,
+        electricity_grid,
+        sanitation_division_days,
+
+        -- location: coordinates
         latitude,
         longitude
 
     from source
-
 )
 
 select * from renamed
