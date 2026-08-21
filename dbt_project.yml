@@ -35,4 +35,4 @@ models:
 # Snapshots capture SCD-2 history of the 311 requests as STATUS mutates.
 snapshots:
   chicago_311:
-    +target_schema: snapshots
+    +schema: snapshots
